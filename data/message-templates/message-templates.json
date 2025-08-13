@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Welcome",
+    "content": "Selamat datang di Kelas Inovatif! 🎉"
+  },
+  {
+    "name": "Promo",
+    "content": "Dapatkan diskon 50% untuk pendaftaran bulan ini! 💰"
+  },
+  {
+    "name": "Reminder",
+    "content": "Jangan lupa jadwal kelas hari ini! ⏰"
+  },
+  {
+    "name": "Media Welcome",
+    "content": "Selamat datang! Ini adalah contoh pesan dengan media 📱",
+    "media": ["C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"]
+  },
+  {
+    "name": "Test Media",
+    "content": "Testing media message functionality",
+    "media": ["C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"]
+  }
+]

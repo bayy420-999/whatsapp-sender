@@ -1,0 +1,46 @@
+{
+  "client": {
+    "headless": true,
+    "puppeteerArgs": [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--disable-gpu"
+    ],
+    "sessionTimeout": 300000
+  },
+  "messaging": {
+    "defaultMinDelay": 3,
+    "defaultMaxDelay": 8,
+    "quickBulkMinDelay": 2,
+    "quickBulkMaxDelay": 6,
+    "maxRetries": 3,
+    "optionalDelays": [
+      {
+        "everyNMessages": {
+          "n": 2,
+          "min": 30,
+          "max": 60
+        }
+      }
+    ]
+  },
+  "paths": {
+    "contactsFolder": "../data/contacts",
+    "templatesFolder": "../data/message-templates",
+    "sessionsFolder": "../sessions"
+  },
+  "autoSave": {
+    "enabled": true,
+    "interval": 30,
+    "createBackups": true
+  },
+  "logging": {
+    "level": "info",
+    "showProgress": true,
+    "showTimestamps": true
+  }
+}

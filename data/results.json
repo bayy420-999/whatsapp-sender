@@ -1,0 +1,158 @@
+[
+  {
+    "id": "session-1755078087865-u4ttvje55",
+    "startTime": "2025-08-13T09:41:27.865Z",
+    "totalContacts": 6,
+    "completedContacts": 4,
+    "failedContacts": 2,
+    "pendingContacts": 0,
+    "results": [
+      {
+        "contact": {
+          "name": "1",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Promo",
+          "content": "Dapatkan diskon 50% untuk pendaftaran bulan ini! 💰"
+        },
+        "status": "success",
+        "timestamp": "2025-08-13T09:41:28.944Z"
+      },
+      {
+        "contact": {
+          "name": "2",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Promo",
+          "content": "Dapatkan diskon 50% untuk pendaftaran bulan ini! 💰"
+        },
+        "status": "success",
+        "timestamp": "2025-08-13T09:41:32.979Z"
+      },
+      {
+        "contact": {
+          "name": "3",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Promo",
+          "content": "Dapatkan diskon 50% untuk pendaftaran bulan ini! 💰"
+        },
+        "status": "success",
+        "timestamp": "2025-08-13T09:42:33.401Z"
+      },
+      {
+        "contact": {
+          "name": "4",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Reminder",
+          "content": "Jangan lupa jadwal kelas hari ini! ⏰"
+        },
+        "status": "success",
+        "timestamp": "2025-08-13T09:42:37.441Z"
+      },
+      {
+        "contact": {
+          "name": "5",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Media Welcome",
+          "content": "Selamat datang! Ini adalah contoh pesan dengan media 📱",
+          "media": [
+            "../public/kelasinovatif-clean.png"
+          ]
+        },
+        "status": "failed",
+        "timestamp": "2025-08-13T09:43:25.466Z",
+        "error": "Media file not found: ../public/kelasinovatif-clean.png"
+      },
+      {
+        "contact": {
+          "name": "2das",
+          "phone": "23123134313"
+        },
+        "template": {
+          "name": "Media Welcome",
+          "content": "Selamat datang! Ini adalah contoh pesan dengan media 📱",
+          "media": [
+            "../public/kelasinovatif-clean.png"
+          ]
+        },
+        "status": "failed",
+        "timestamp": "2025-08-13T09:43:25.474Z",
+        "error": "Media file not found: ../public/kelasinovatif-clean.png"
+      }
+    ],
+    "status": "completed",
+    "delaySettings": {
+      "minDelay": 3,
+      "maxDelay": 8,
+      "optionalDelays": [
+        {
+          "everyNMessages": {
+            "n": 2,
+            "min": 30,
+            "max": 60
+          }
+        }
+      ]
+    },
+    "endTime": "2025-08-13T09:43:25.480Z"
+  },
+  {
+    "id": "session-1755078907788-cuv7ffwac",
+    "startTime": "2025-08-13T09:55:07.788Z",
+    "totalContacts": 6,
+    "completedContacts": 2,
+    "failedContacts": 0,
+    "pendingContacts": 4,
+    "results": [
+      {
+        "contact": {
+          "name": "1",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Reminder",
+          "content": "Jangan lupa jadwal kelas hari ini! ⏰"
+        },
+        "status": "success",
+        "timestamp": "2025-08-13T09:55:11.233Z"
+      },
+      {
+        "contact": {
+          "name": "2",
+          "phone": "+6285173311574"
+        },
+        "template": {
+          "name": "Media Welcome",
+          "content": "Selamat datang! Ini adalah contoh pesan dengan media 📱",
+          "media": [
+            "C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"
+          ]
+        },
+        "status": "success",
+        "timestamp": "2025-08-13T09:55:20.631Z"
+      }
+    ],
+    "status": "running",
+    "delaySettings": {
+      "minDelay": 2,
+      "maxDelay": 6,
+      "optionalDelays": [
+        {
+          "everyNMessages": {
+            "n": 2,
+            "min": 30,
+            "max": 60
+          }
+        }
+      ]
+    }
+  }
+]
