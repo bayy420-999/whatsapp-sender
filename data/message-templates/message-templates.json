@@ -14,11 +14,19 @@
   {
     "name": "Media Welcome",
     "content": "Selamat datang! Ini adalah contoh pesan dengan media 📱",
-    "media": ["C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"]
+    "media": [
+      "C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"
+    ]
   },
   {
     "name": "Test Media",
     "content": "Testing media message functionality",
-    "media": ["C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"]
+    "media": [
+      "C:\\Users\\sangk\\Desktop\\Projects\\kelasinovatif-assets\\banner.png"
+    ]
+  },
+  {
+    "name": "ggg",
+    "content": "sadas"
   }
 ]

@@ -79,7 +79,7 @@ export const defaultConfig: WhatsAppConfig = {
   paths: {
     contactsFolder: '../data/contacts',
     templatesFolder: '../data/message-templates',
-    sessionsFolder: '../sessions'
+    sessionsFolder: '../data/sessions'
   },
   
   autoSave: {

@@ -17,6 +17,16 @@ A powerful and interactive WhatsApp message sender built with whatsapp-web.js an
 - 💬 **Auto-reply** - Automatic responses to incoming messages
 - 🆕 **Latest Technology** - Built with whatsapp-web.js v1.32.0 and TypeScript 5.6+
 
+## 🚀 New in Version 1.5.0
+
+- **Individual Session Files** - Each bulk messaging session stored as separate JSON files
+- **Improved Ctrl+C Handling** - Sessions properly marked as "interrupted" when stopped
+- **Session Cleanup** - Automatic cleanup of old sessions with configurable retention
+- **Session Export** - Export all sessions to a single file for backup/analysis
+- **Individual Session Deletion** - Remove specific session files as needed
+- **Better Performance** - Faster loading and management of session data
+- **Enhanced Signal Handling** - Proper graceful shutdown with session preservation
+
 ## 🚀 New in Version 1.4.0
 
 - **Progress Tracking System** - Track every bulk messaging session with detailed results
@@ -58,7 +68,7 @@ A powerful and interactive WhatsApp message sender built with whatsapp-web.js an
 
 ## 📁 Data Structure
 
-The application now uses an organized directory structure:
+The application now uses an organized directory structure with individual session files:
 
 ```
 whatsapp-sender/
@@ -67,7 +77,10 @@ whatsapp-sender/
 │   │   └── contacts.json           # Primary contacts file
 │   ├── message-templates/          # Template files directory
 │   │   └── message-templates.json  # Primary templates file
-│   └── results.json                # Session progress tracking
+│   └── results/                    # Session results directory
+│       ├── session-1234567890-abc123.json  # Individual session files
+│       ├── session-1234567891-def456.json  # Each session has its own file
+│       └── README.md               # Session management documentation
 ├── sessions/                        # WhatsApp session data
 ├── dist/                           # Compiled JavaScript
 └── config.json                     # Application configuration
@@ -147,6 +160,8 @@ whatsapp-sender/
 - **View Settings:** See current configuration values
 - **Update Delays:** Modify delay ranges for messaging
 - **Client Settings:** Toggle headless mode and other options
+- **Session Cleanup:** Configure automatic cleanup of old sessions
+- **Export Sessions:** Export all sessions to a single file
 - **Reset to Defaults:** Restore factory settings
 - **Auto-Save:** Changes are automatically saved to config.json
 
@@ -164,7 +179,15 @@ Every bulk messaging operation creates a unique session with:
 - **Detailed Results**: Contact-level success/failure tracking
 
 ### Results Storage
-All session data is automatically saved to `data/results.json`:
+Each session is automatically saved to its own file in `data/results/` directory:
+```
+data/results/
+├── session-1234567890-abc123.json
+├── session-1234567891-def456.json
+└── session-1234567892-ghi789.json
+```
+
+Each session file contains:
 ```json
 {
   "id": "session-1234567890-abc123",
@@ -173,7 +196,12 @@ All session data is automatically saved to `data/results.json`:
   "completedContacts": 75,
   "failedContacts": 5,
   "pendingContacts": 20,
-  "status": "running",
+  "status": "interrupted",
+  "endTime": "2025-08-13T10:05:00.000Z",
+  "delaySettings": {
+    "minDelay": 3,
+    "maxDelay": 8
+  },
   "results": [
     {
       "contact": { "name": "John", "phone": "+1234567890" },
@@ -191,6 +219,14 @@ If a bulk messaging session is interrupted:
 2. **Progress Preservation**: All completed messages are preserved
 3. **Smart Resume**: Only sends to remaining contacts
 4. **Session Continuation**: Continues with same delay settings
+
+### Enhanced Session Management
+- **Individual Session Files**: Each session stored separately for better performance
+- **Session Cleanup**: Automatically remove old sessions (configurable retention period)
+- **Session Export**: Export all sessions to a single file for backup/analysis
+- **Individual Deletion**: Remove specific session files as needed
+- **Improved Ctrl+C Handling**: Sessions properly marked as "interrupted" when stopped
+- **Graceful Shutdown**: Proper signal handling for SIGINT (Ctrl+C) and SIGTERM
 
 ## 🖼️ Media Message Support
 
@@ -262,6 +298,13 @@ The application automatically creates and manages a configuration file:
 ```bash
 npm run dev
 ```
+
+### Signal Handling
+The application now properly handles system signals for graceful shutdown:
+- **Ctrl+C (SIGINT)**: Properly marks running sessions as "interrupted"
+- **SIGTERM**: Graceful shutdown with session preservation
+- **Session State**: Sessions are saved with correct status before exit
+- **Data Integrity**: No more "running" sessions after unexpected shutdowns
 
 ### Building the Project
 ```bash
@@ -354,7 +397,17 @@ If you encounter any issues or have questions:
 
 ## 📝 Changelog
 
-### Version 1.4.0 ⭐ NEW
+### Version 1.5.0 ⭐ NEW
+- **Individual Session Files** - Each session stored as separate JSON files for better performance
+- **Improved Ctrl+C Handling** - Sessions properly marked as "interrupted" when stopped with Ctrl+C
+- **Session Cleanup** - Automatic cleanup of old sessions with configurable retention period
+- **Session Export** - Export all sessions to a single file for backup and analysis
+- **Individual Session Deletion** - Remove specific session files as needed
+- **Enhanced Signal Handling** - Proper graceful shutdown with SIGINT and SIGTERM support
+- **Better Performance** - Faster loading and management of session data
+- **Data Integrity** - No more "running" sessions after unexpected shutdowns
+
+### Version 1.4.0
 - **Progress Tracking System** - Complete session management with detailed results
 - **Session Resume** - Continue interrupted bulk messaging sessions
 - **Media Message Support** - Send images/videos with captions

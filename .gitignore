@@ -101,6 +101,10 @@ ehthumbs.db
 Thumbs.db
 
 # WhatsApp session data (contains sensitive information)
-sessions/
+data/sessions/
+data/results/
 wa-blast-session-*/
 session-*/
+
+# WhatsApp Web.js cache
+.wwebjs_cache/

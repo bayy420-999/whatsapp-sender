@@ -49,7 +49,7 @@ class WhatsAppSender {
   private isReady = false;
   private configManager: ConfigManager;
   private currentSession: BulkMessageSession | null = null;
-  private sessionResultsPath = path.join(__dirname, '../data/results.json');
+  private sessionResultsDir = path.join(__dirname, '../data/results');
 
   constructor() {
     this.configManager = new ConfigManager();
@@ -57,7 +57,7 @@ class WhatsAppSender {
     this.client = new Client({
       authStrategy: new LocalAuth({
         clientId: 'whatsapp-sender',
-        dataPath: path.join(__dirname, '../sessions')
+        dataPath: path.join(__dirname, '../data/sessions')
       }),
       puppeteer: {
         headless: defaultConfig.client.headless,
@@ -221,6 +221,14 @@ class WhatsAppSender {
     console.log('=====================================');
 
     while (true) {
+            // Show current session status if any
+      if (this.hasCurrentSession()) {
+        const session = this.currentSession!;
+        console.log(`\n📊 Current Session: ${session.id}`);
+        console.log(`   Progress: ${session.completedContacts}/${session.totalContacts} (${((session.completedContacts / session.totalContacts) * 100).toFixed(1)}%)`);
+        console.log(`   Status: ${session.status.toUpperCase()}`);
+      }
+
       const { action } = await inquirer.prompt([
         {
           type: 'list',
@@ -364,7 +372,7 @@ class WhatsAppSender {
     await this.saveSessionResults();
   }
 
-  private async completeSession(status: 'completed' | 'interrupted'): Promise<void> {
+  public async completeSession(status: 'completed' | 'interrupted'): Promise<void> {
     if (!this.currentSession) return;
 
     this.currentSession.status = status;
@@ -388,43 +396,153 @@ class WhatsAppSender {
     this.currentSession = null;
   }
 
+  public hasCurrentSession(): boolean {
+    return this.currentSession !== null && this.currentSession.status === 'running';
+  }
+
   private async saveSessionResults(): Promise<void> {
     if (!this.currentSession) return;
 
     try {
-      // Ensure data directory exists
-      const dataDir = path.dirname(this.sessionResultsPath);
-      await fs.mkdir(dataDir, { recursive: true });
+      // Ensure results directory exists
+      await fs.mkdir(this.sessionResultsDir, { recursive: true });
 
-      // Load existing results
-      let allResults: BulkMessageSession[] = [];
-      try {
-        const existingData = await fs.readFile(this.sessionResultsPath, 'utf-8');
-        allResults = JSON.parse(existingData);
-      } catch {
-        // File doesn't exist or is invalid, start fresh
-      }
-
-      // Update or add current session
-      const existingIndex = allResults.findIndex(s => s.id === this.currentSession!.id);
-      if (existingIndex >= 0) {
-        allResults[existingIndex] = this.currentSession;
-      } else {
-        allResults.push(this.currentSession);
-      }
-
-      // Save all results
-      await fs.writeFile(this.sessionResultsPath, JSON.stringify(allResults, null, 2));
+      // Create individual session file
+      const sessionFilePath = path.join(this.sessionResultsDir, `${this.currentSession.id}.json`);
+      await fs.writeFile(sessionFilePath, JSON.stringify(this.currentSession, null, 2));
     } catch (error) {
       console.error('❌ Failed to save session results:', error);
     }
   }
 
+  private async deleteSessionFile(sessionId: string): Promise<void> {
+    try {
+      const sessionFilePath = path.join(this.sessionResultsDir, `${sessionId}.json`);
+      await fs.unlink(sessionFilePath);
+    } catch (error) {
+      console.warn(`⚠️ Failed to delete session file ${sessionId}:`, error);
+    }
+  }
+
+  private async cleanupOldSessions(maxAgeDays: number = 30): Promise<void> {
+    try {
+      const files = await fs.readdir(this.sessionResultsDir);
+      const jsonFiles = files.filter(file => file.endsWith('.json'));
+      const cutoffTime = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
+      
+      for (const file of jsonFiles) {
+        try {
+          const filePath = path.join(this.sessionResultsDir, file);
+          const stats = await fs.stat(filePath);
+          
+          if (stats.mtime.getTime() < cutoffTime) {
+            await fs.unlink(filePath);
+            console.log(`🗑️ Cleaned up old session file: ${file}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to process file ${file} during cleanup:`, error);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to cleanup old sessions:', error);
+    }
+  }
+
+  private async deleteSession(): Promise<void> {
+    const allSessions = await this.loadSessionResults();
+    
+    if (allSessions.length === 0) {
+      console.log('📋 No sessions to delete.');
+      return;
+    }
+
+    const { sessionChoice } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'sessionChoice',
+        message: 'Select a session to delete:',
+        choices: [
+          ...allSessions.map(session => ({
+            name: `${session.id} - ${session.status} (${session.completedContacts}/${session.totalContacts})`,
+            value: session.id
+          })),
+          { name: 'Cancel', value: null }
+        ]
+      }
+    ]);
+
+    if (!sessionChoice) {
+      console.log('❌ Deletion cancelled.');
+      return;
+    }
+
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: `Are you sure you want to delete session ${sessionChoice}? This action cannot be undone.`,
+        default: false
+      }
+    ]);
+
+    if (confirm) {
+      try {
+        await this.deleteSessionFile(sessionChoice);
+        console.log(`✅ Session ${sessionChoice} deleted successfully.`);
+      } catch (error) {
+        console.error('❌ Failed to delete session:', error);
+      }
+    } else {
+      console.log('❌ Deletion cancelled.');
+    }
+  }
+
+  private async exportAllSessions(): Promise<void> {
+    const allSessions = await this.loadSessionResults();
+    
+    if (allSessions.length === 0) {
+      console.log('📋 No sessions to export.');
+      return;
+    }
+
+    try {
+      const exportPath = path.join(__dirname, '../data/sessions-export.json');
+      await fs.writeFile(exportPath, JSON.stringify(allSessions, null, 2));
+      console.log(`✅ All sessions exported to: ${exportPath}`);
+      console.log(`📊 Total sessions exported: ${allSessions.length}`);
+    } catch (error) {
+      console.error('❌ Failed to export sessions:', error);
+    }
+  }
+
   private async loadSessionResults(): Promise<BulkMessageSession[]> {
     try {
-      const data = await fs.readFile(this.sessionResultsPath, 'utf-8');
-      return JSON.parse(data);
-    } catch {
+      // Ensure results directory exists
+      await fs.mkdir(this.sessionResultsDir, { recursive: true });
+
+      // Read all session files from the results directory
+      const files = await fs.readdir(this.sessionResultsDir);
+      const jsonFiles = files.filter(file => file.endsWith('.json'));
+      
+      const allSessions: BulkMessageSession[] = [];
+      
+      for (const file of jsonFiles) {
+        try {
+          const filePath = path.join(this.sessionResultsDir, file);
+          const data = await fs.readFile(filePath, 'utf-8');
+          const session = JSON.parse(data);
+          allSessions.push(session);
+        } catch (error) {
+          console.warn(`⚠️ Failed to load session file ${file}:`, error);
+        }
+      }
+      
+      // Sort sessions by start time (newest first)
+      return allSessions.sort((a, b) => 
+        new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      );
+    } catch (error) {
+      console.warn('⚠️ Failed to load session results:', error);
       return [];
     }
   }
@@ -518,6 +636,23 @@ class WhatsAppSender {
           .forEach(r => console.log(`      ${r.contact.name} (${r.contact.phone}): ${r.error}`));
       }
     });
+
+    // Add option to delete sessions
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          'Delete a session',
+          'Back to main menu'
+        ]
+      }
+    ]);
+
+    if (action === 'Delete a session') {
+      await this.deleteSession();
+    }
   }
 
   private async sendSingleMessage(): Promise<void> {
@@ -861,6 +996,12 @@ class WhatsAppSender {
     const { minDelay, maxDelay, optionalDelays } = delaySettings;
     
     for (let i = 0; i < contacts.length; i++) {
+      // Check if session has been interrupted
+      if (this.currentSession && this.currentSession.status === 'interrupted') {
+        console.log('🛑 Session has been interrupted. Stopping bulk messaging.');
+        return;
+      }
+      
       const contact = contacts[i];
       
       // Select a random message template for each contact
@@ -995,6 +1136,8 @@ class WhatsAppSender {
            'Update Delay Settings',
            'Update Optional Delays',
            'Update Client Settings',
+           'Cleanup Old Sessions',
+           'Export All Sessions',
            'Reset to Defaults',
            'Back to Main Menu'
          ]
@@ -1014,6 +1157,12 @@ class WhatsAppSender {
        case 'Update Client Settings':
          await this.updateClientSettings();
          break;
+      case 'Cleanup Old Sessions':
+        await this.cleanupOldSessions();
+        break;
+      case 'Export All Sessions':
+        await this.exportAllSessions();
+        break;
       case 'Reset to Defaults':
         await this.resetConfiguration();
         break;
@@ -1231,8 +1380,32 @@ class WhatsAppSender {
   }
 }
 
+// Global sender instance for signal handlers
+let globalSender: WhatsAppSender | null = null;
+
+// Handle graceful shutdown signals
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+  
+  // Mark current session as interrupted if it exists
+  if (globalSender && globalSender.hasCurrentSession()) {
+    console.log('📊 Marking current session as interrupted...');
+    await globalSender.completeSession('interrupted');
+  }
+  
+  if (globalSender) {
+    await globalSender.destroy();
+  }
+  process.exit(0);
+};
+
+// Set up signal handlers
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
 async function main(): Promise<void> {
   const sender = new WhatsAppSender();
+  globalSender = sender; // Set global reference
   
   try {
     await sender.initialize();
@@ -1241,20 +1414,10 @@ async function main(): Promise<void> {
     console.error('💥 Fatal error:', error);
   } finally {
     await sender.destroy();
+    globalSender = null;
     process.exit(0);
   }
 }
-
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  process.exit(0);
-});
 
 main().catch((error) => {
   console.error('💥 Unhandled error:', error);

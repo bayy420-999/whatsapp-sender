@@ -31,7 +31,7 @@
   "paths": {
     "contactsFolder": "../data/contacts",
     "templatesFolder": "../data/message-templates",
-    "sessionsFolder": "../sessions"
+    "sessionsFolder": "../data/sessions"
   },
   "autoSave": {
     "enabled": true,
