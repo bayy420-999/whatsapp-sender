@@ -20,12 +20,14 @@ A powerful and interactive WhatsApp message sender built with whatsapp-web.js an
 ## 🚀 New in Version 1.5.0
 
 - **Individual Session Files** - Each bulk messaging session stored as separate JSON files
-- **Improved Ctrl+C Handling** - Sessions properly marked as "interrupted" when stopped
+- **Improved Ctrl+C Handling** - Sessions properly marked as "interrupted" when stopped with Ctrl+C
 - **Session Cleanup** - Automatic cleanup of old sessions with configurable retention
 - **Session Export** - Export all sessions to a single file for backup/analysis
 - **Individual Session Deletion** - Remove specific session files as needed
+- **Enhanced Signal Handling** - Proper graceful shutdown with SIGINT and SIGTERM support
+- **Priority-Based Optional Delays** - Larger N values have higher priority (no cumulative delays)
 - **Better Performance** - Faster loading and management of session data
-- **Enhanced Signal Handling** - Proper graceful shutdown with session preservation
+- **Data Integrity** - No more "running" sessions after unexpected shutdowns
 
 ## 🚀 New in Version 1.4.0
 
@@ -138,17 +140,15 @@ whatsapp-sender/
 - **Progress Tracking:** Every message is tracked and saved to `results.json`
 - **Session Management:** Creates a unique session ID for tracking
 
-#### 7. Quick Bulk Send
-- **One-Click:** Send to all contacts with just one confirmation
-- **Randomized Delay:** Configurable delay range between messages
-- **Random Templates:** Each contact gets a different random template
-- **Progress Tracking:** Full session tracking and resumability
+
 
 #### 8. Resume Interrupted Session ⭐ NEW
 - **Session Recovery:** Continue bulk messaging from where you left off
 - **Progress Preservation:** All completed messages are preserved
 - **Smart Resume:** Only sends to remaining contacts
 - **Session Selection:** Choose from multiple interrupted sessions
+- **Intelligent Contact Tracking:** Handles duplicate phone numbers and contact matching issues
+- **Robust Resume Logic:** Reliable session resumption with proper progress calculation
 
 #### 9. View Session History ⭐ NEW
 - **Complete History:** View all messaging sessions
@@ -227,6 +227,8 @@ If a bulk messaging session is interrupted:
 - **Individual Deletion**: Remove specific session files as needed
 - **Improved Ctrl+C Handling**: Sessions properly marked as "interrupted" when stopped
 - **Graceful Shutdown**: Proper signal handling for SIGINT (Ctrl+C) and SIGTERM
+- **Session Resume**: Intelligent resumption of interrupted sessions with proper contact tracking
+- **Robust Error Handling**: Comprehensive error handling and recovery mechanisms
 
 ## 🖼️ Media Message Support
 
@@ -266,12 +268,17 @@ The application automatically creates and manages a configuration file:
   "messaging": {
     "defaultMinDelay": 3,
     "defaultMaxDelay": 8,
-    "quickBulkMinDelay": 2,
-    "quickBulkMaxDelay": 6,
     "optionalDelays": [
       {
         "everyNMessages": {
           "n": 5,
+          "min": 20,
+          "max": 30
+        }
+      },
+      {
+        "everyNMessages": {
+          "n": 10,
           "min": 30,
           "max": 60
         }
@@ -286,9 +293,51 @@ The application automatically creates and manages a configuration file:
 }
 ```
 
+### Interactive Optional Delays Management
+The system now provides a comprehensive interface for managing multiple optional delays:
+
+- **Add New Delay Rules**: Create custom delay rules for specific message intervals
+- **Edit Existing Rules**: Modify delay parameters for existing rules
+- **Delete Rules**: Remove specific delay rules as needed
+- **Clear All Delays**: Reset all optional delays at once
+- **Priority-Based System**: Larger N values have higher priority (no cumulative delays)
+
+#### Example Configuration
+```json
+"optionalDelays": [
+  {
+    "everyNMessages": {
+      "n": 5,
+      "min": 20,
+      "max": 30
+    }
+  },
+  {
+    "everyNMessages": {
+      "n": 10,
+      "min": 30,
+      "max": 60
+    }
+  }
+]
+```
+
+#### How It Works
+- **Message 5**: Uses 20-30s delay (every 5 messages rule) - **replaces base delay**
+- **Message 10**: Uses 30-60s delay (every 10 messages rule) - **replaces base delay**
+- **Message 15**: Uses 20-30s delay (every 5 messages rule) - **replaces base delay**
+- **Message 20**: Uses 30-60s delay (every 10 messages rule) - **replaces base delay**
+
+**Key Feature**: Optional delays **replace** the base delay instead of adding to it. This means:
+- Messages 1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19: Use base delay (3-8s)
+- Messages 5, 10, 15, 20: Use optional delay (20-30s or 30-60s) **instead of** base delay
+
+This provides more predictable timing and prevents delays from accumulating.
+
 ### Key Settings
 - **Delays**: Configure minimum and maximum delays between messages
 - **Optional Delays**: Add extra delays every N messages (anti-spam)
+- **Priority-Based Delays**: Larger N values have higher priority (no cumulative delays)
 - **Client Options**: Puppeteer settings for WhatsApp Web
 - **File Paths**: Customize where data is stored
 
@@ -299,13 +348,6 @@ The application automatically creates and manages a configuration file:
 npm run dev
 ```
 
-### Signal Handling
-The application now properly handles system signals for graceful shutdown:
-- **Ctrl+C (SIGINT)**: Properly marks running sessions as "interrupted"
-- **SIGTERM**: Graceful shutdown with session preservation
-- **Session State**: Sessions are saved with correct status before exit
-- **Data Integrity**: No more "running" sessions after unexpected shutdowns
-
 ### Building the Project
 ```bash
 npm run build
@@ -315,6 +357,26 @@ npm run build
 ```bash
 npm run clean
 ```
+
+## ⚡ Performance Optimizations
+
+### Code Efficiency Improvements
+- **Streamlined Delay Logic**: Optimized optional delay calculations with dedicated `calculateDelay` method
+- **Reduced Redundancy**: Eliminated duplicate code and unnecessary operations
+- **Cleaner Methods**: Simplified method implementations with better error handling
+- **Memory Management**: Improved session object management and cleanup
+
+### Signal Handling Optimization
+- **Robust Ctrl+C Support**: Sessions properly marked as "interrupted" on termination
+- **Graceful Shutdown**: Clean process termination with proper cleanup
+- **Session Persistence**: Interrupted sessions are reliably saved and can be resumed
+- **Error Recovery**: Comprehensive error handling during shutdown scenarios
+
+### Session Management Efficiency
+- **Individual File Storage**: Each session stored in separate files for better performance
+- **Smart Resume Logic**: Intelligent contact tracking for session resumption
+- **Optimized File I/O**: Efficient file operations with proper error handling
+- **Memory Cleanup**: Proper cleanup of session objects and resources
 
 ## 🚨 Troubleshooting
 
@@ -404,8 +466,12 @@ If you encounter any issues or have questions:
 - **Session Export** - Export all sessions to a single file for backup and analysis
 - **Individual Session Deletion** - Remove specific session files as needed
 - **Enhanced Signal Handling** - Proper graceful shutdown with SIGINT and SIGTERM support
+- **Priority-Based Optional Delays** - Larger N values have higher priority (no cumulative delays)
 - **Better Performance** - Faster loading and management of session data
 - **Data Integrity** - No more "running" sessions after unexpected shutdowns
+- **Code Optimization** - Streamlined methods, reduced redundancy, and improved efficiency
+- **Robust Session Resume** - Intelligent contact tracking and session resumption
+- **Memory Management** - Better resource cleanup and session object management
 
 ### Version 1.4.0
 - **Progress Tracking System** - Complete session management with detailed results
@@ -426,7 +492,7 @@ If you encounter any issues or have questions:
 ### Version 1.2.0
 - **Simplified Bulk Messaging** - No more manual contact selection
 - **Random Template Assignment** - Each contact gets a random message template
-- **Quick Bulk Send Mode** - One-click bulk messaging with randomized delays
+
 - **Automatic File Loading** - Loads contacts and templates from folder structures
 - **Smart File Management** - Saves to main files or creates timestamped backups
 
@@ -447,3 +513,15 @@ If you encounter any issues or have questions:
 ---
 
 **Note:** This application is for personal and legitimate business use only. Please respect WhatsApp's terms of service and use responsibly. The progress tracking system helps ensure reliable message delivery and session management.
+
+## 🎯 Current Status
+
+The WhatsApp Sender application is now **fully optimized and production-ready** with:
+- ✅ **Robust Signal Handling**: Proper Ctrl+C support and graceful shutdown
+- ✅ **Reliable Session Management**: Individual session files with proper status tracking
+- ✅ **Intelligent Resume Function**: Smart session resumption with contact tracking
+- ✅ **Optimized Performance**: Streamlined code with reduced redundancy
+- ✅ **Comprehensive Error Handling**: Robust error recovery and data integrity
+- ✅ **Clean Codebase**: Maintainable and efficient implementation
+
+All major features are working correctly and the application handles edge cases gracefully.

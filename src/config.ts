@@ -10,8 +10,6 @@ export interface WhatsAppConfig {
   messaging: {
     defaultMinDelay: number;
     defaultMaxDelay: number;
-    quickBulkMinDelay: number;
-    quickBulkMaxDelay: number;
     maxRetries: number;
     optionalDelays: {
       everyNMessages: {
@@ -62,10 +60,17 @@ export const defaultConfig: WhatsAppConfig = {
   messaging: {
     defaultMinDelay: 3,
     defaultMaxDelay: 8,
-    quickBulkMinDelay: 2,
-    quickBulkMaxDelay: 6,
     maxRetries: 3,
+    // Priority-based optional delays: larger 'n' values have higher priority
+    // For message 10: uses 30-60s delay (every 10) instead of 20-30s (every 5)
     optionalDelays: [
+      {
+        everyNMessages: {
+          n: 5,
+          min: 20,
+          max: 30
+        }
+      },
       {
         everyNMessages: {
           n: 10,

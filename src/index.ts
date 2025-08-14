@@ -1,4 +1,4 @@
-import { Client, LocalAuth, Message } from 'whatsapp-web.js';
+import { Client, LocalAuth } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import inquirer from 'inquirer';
 import { promises as fs } from 'fs';
@@ -93,26 +93,10 @@ class WhatsAppSender {
       this.isReady = false;
     });
 
-    this.client.on('message', (message: Message) => {
-      return;
-      //this.handleIncomingMessage(message);
-    });
+
   }
 
-  private async handleIncomingMessage(message: Message): Promise<void> {
-    if (message.from === 'status@broadcast') return; // Ignore status messages
-    
-    console.log(`\n📨 New message from ${message.from}: ${message.body}`);
-    
-    // Auto-reply functionality can be added here
-    if (message.body.toLowerCase().includes('hello') || message.body.toLowerCase().includes('hi')) {
-      try {
-        await message.reply('Hello! This is an automated response from WhatsApp Sender.');
-      } catch (error) {
-        console.error('Failed to send auto-reply:', error);
-      }
-    }
-  }
+
 
   public async initialize(): Promise<void> {
     try {
@@ -243,7 +227,6 @@ class WhatsAppSender {
             'View Message Templates',
             'Load Message Templates File',
             'Send Bulk Messages',
-            'Quick Bulk Send',
             'Resume Interrupted Session',
             'View Session History',
             'Manage Configuration',
@@ -277,9 +260,7 @@ class WhatsAppSender {
         case 'Send Bulk Messages':
           await this.sendBulkMessages();
           break;
-        case 'Quick Bulk Send':
-          await this.quickBulkSend();
-          break;
+
         case 'Resume Interrupted Session':
           await this.resumeInterruptedSession();
           break;
@@ -400,16 +381,33 @@ class WhatsAppSender {
     return this.currentSession !== null && this.currentSession.status === 'running';
   }
 
+  public interruptCurrentSession(): void {
+    if (this.currentSession && this.currentSession.status === 'running') {
+      console.log('🛑 Interrupting current session...');
+      
+      this.currentSession.status = 'interrupted';
+      this.currentSession.endTime = new Date().toISOString();
+      
+      try {
+        const fs = require('fs');
+        const sessionFilePath = require('path').join(this.sessionResultsDir, `${this.currentSession.id}.json`);
+        const sessionData = JSON.stringify(this.currentSession, null, 2);
+        fs.writeFileSync(sessionFilePath, sessionData);
+        console.log('💾 Session status saved as interrupted');
+      } catch (error) {
+        console.error('❌ Failed to save session:', error);
+      }
+    }
+  }
+
   private async saveSessionResults(): Promise<void> {
     if (!this.currentSession) return;
 
     try {
-      // Ensure results directory exists
       await fs.mkdir(this.sessionResultsDir, { recursive: true });
-
-      // Create individual session file
       const sessionFilePath = path.join(this.sessionResultsDir, `${this.currentSession.id}.json`);
-      await fs.writeFile(sessionFilePath, JSON.stringify(this.currentSession, null, 2));
+      const sessionData = JSON.stringify(this.currentSession, null, 2);
+      await fs.writeFile(sessionFilePath, sessionData);
     } catch (error) {
       console.error('❌ Failed to save session results:', error);
     }
@@ -492,7 +490,7 @@ class WhatsAppSender {
       } catch (error) {
         console.error('❌ Failed to delete session:', error);
       }
-    } else {
+      } else {
       console.log('❌ Deletion cancelled.');
     }
   }
@@ -517,10 +515,7 @@ class WhatsAppSender {
 
   private async loadSessionResults(): Promise<BulkMessageSession[]> {
     try {
-      // Ensure results directory exists
       await fs.mkdir(this.sessionResultsDir, { recursive: true });
-
-      // Read all session files from the results directory
       const files = await fs.readdir(this.sessionResultsDir);
       const jsonFiles = files.filter(file => file.endsWith('.json'));
       
@@ -537,7 +532,6 @@ class WhatsAppSender {
         }
       }
       
-      // Sort sessions by start time (newest first)
       return allSessions.sort((a, b) => 
         new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
       );
@@ -588,19 +582,21 @@ class WhatsAppSender {
     console.log(`\n🔄 Resuming session: ${session.id}`);
     console.log(`   Progress: ${session.completedContacts}/${session.totalContacts}`);
     
-    // Get remaining contacts (those not yet processed)
-    const processedContacts = new Set(session.results.map(r => r.contact.phone));
-    const remainingContacts = this.contacts.filter(c => !processedContacts.has(c.phone));
+    const processedResults = session.results || [];
+    const totalContacts = session.totalContacts || 0;
+    const remainingCount = totalContacts - processedResults.length;
     
-    if (remainingContacts.length === 0) {
+    if (remainingCount <= 0) {
       console.log('✅ All contacts in this session have been processed.');
       await this.completeSession('completed');
       return;
     }
 
-    console.log(`📱 Resuming with ${remainingContacts.length} remaining contacts...`);
+    const startIndex = processedResults.length;
+    const endIndex = Math.min(startIndex + remainingCount, this.contacts.length);
+    const remainingContacts = this.contacts.slice(startIndex, endIndex);
     
-    // Continue with remaining contacts
+    console.log(`📱 Resuming with ${remainingContacts.length} remaining contacts...`);
     await this.sendBulkMessagesInternal(remainingContacts, session.delaySettings);
   }
 
@@ -995,23 +991,20 @@ class WhatsAppSender {
   private async sendBulkMessagesInternal(contacts: Contact[], delaySettings: any): Promise<void> {
     const { minDelay, maxDelay, optionalDelays } = delaySettings;
     
+    try {
     for (let i = 0; i < contacts.length; i++) {
-      // Check if session has been interrupted
-      if (this.currentSession && this.currentSession.status === 'interrupted') {
-        console.log('🛑 Session has been interrupted. Stopping bulk messaging.');
-        return;
-      }
+        if (this.currentSession?.status === 'interrupted') {
+          console.log('🛑 Session interrupted. Stopping bulk messaging.');
+          return;
+        }
       
-      const contact = contacts[i];
-      
-      // Select a random message template for each contact
+        const contact = contacts[i];
       const randomTemplate = this.messageTemplates[Math.floor(Math.random() * this.messageTemplates.length)];
       
       try {
         const formattedPhone = this.formatPhoneNumber(contact.phone);
         console.log(`📱 [${i + 1}/${contacts.length}] Sending "${randomTemplate.name}" to ${contact.name}...`);
         
-        // Check if template has media
         if (randomTemplate.media && randomTemplate.media.length > 0) {
           await this.sendMediaMessage(formattedPhone, randomTemplate);
         } else {
@@ -1022,94 +1015,56 @@ class WhatsAppSender {
         await this.updateSessionProgress(contact, randomTemplate, 'success');
 
         if (i < contacts.length - 1) {
-          const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-          console.log(`⏳ Waiting ${randomDelay} seconds before next message...`);
-          await new Promise(resolve => setTimeout(resolve, randomDelay * 1000));
-          
-          // Check if we need to apply optional delay every N messages
-          if (optionalDelays && optionalDelays.length > 0) {
-            for (const delayRule of optionalDelays) {
-              if (delayRule.everyNMessages && (i + 1) % delayRule.everyNMessages.n === 0) {
-                const optionalMinDelay = delayRule.everyNMessages.min;
-                const optionalMaxDelay = delayRule.everyNMessages.max;
-                const optionalRandomDelay = Math.floor(Math.random() * (optionalMaxDelay - optionalMinDelay + 1)) + optionalMinDelay;
-                console.log(`🔄 Every ${delayRule.everyNMessages.n} messages delay: Waiting ${optionalRandomDelay} seconds...`);
-                await new Promise(resolve => setTimeout(resolve, optionalRandomDelay * 1000));
-                break; // Only apply one delay rule per message
-              }
-            }
+            const delay = this.calculateDelay(i + 1, minDelay, maxDelay, optionalDelays);
+            if (delay > 0) {
+              console.log(`⏳ Waiting ${delay} seconds...`);
+              await new Promise(resolve => setTimeout(resolve, delay * 1000));
           }
         }
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`❌ Failed to send message to ${contact.name}: ${errorMessage}`);
         await this.updateSessionProgress(contact, randomTemplate, 'failed', errorMessage);
+        }
       }
-    }
-  }
-
-  private async quickBulkSend(): Promise<void> {
-    if (this.contacts.length === 0) {
-      console.log('❌ No contacts available. Please add contacts first.');
-      return;
-    }
-
-    if (this.messageTemplates.length === 0) {
-      console.log('❌ No message templates available. Please add templates first.');
-      return;
-    }
-
-    console.log(`\n🚀 QUICK BULK SEND MODE`);
-    console.log(`========================`);
-    console.log(`📋 Contacts: ${this.contacts.length} loaded`);
-    console.log(`📝 Templates: ${this.messageTemplates.length} available`);
-    const quickBulkConfig = this.configManager.get('messaging');
-    console.log(`⏱️  Delay range: ${quickBulkConfig.quickBulkMinDelay}-${quickBulkConfig.quickBulkMaxDelay} seconds (randomized)`);
-    console.log('');
-
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: `Send random messages to ALL ${this.contacts.length} contacts?`,
-        default: false
+      
+      if (this.currentSession) {
+        console.log('🎉 All messages sent successfully!');
+        await this.completeSession('completed');
       }
-    ]);
-
-    if (!confirm) {
-      console.log('❌ Bulk send cancelled.');
-      return;
-    }
-
-    const delaySettings = { 
-      minDelay: quickBulkConfig.quickBulkMinDelay, 
-      maxDelay: quickBulkConfig.quickBulkMaxDelay, 
-      optionalDelays: quickBulkConfig.optionalDelays 
-    };
-    
-    // Create new session for progress tracking
-    const session = await this.createNewSession(this.contacts.length, delaySettings);
-    
-    console.log(`\n📤 Starting quick bulk send to ${this.contacts.length} contacts...`);
-    console.log(`📝 Using random templates for variety`);
-    console.log(`⏱️  Delay range: ${quickBulkConfig.quickBulkMinDelay}-${quickBulkConfig.quickBulkMaxDelay} seconds (randomized)`);
-    console.log(`📊 Session ID: ${session.id}`);
-    console.log('');
-
-    try {
-      await this.sendBulkMessagesInternal(this.contacts, delaySettings);
-      await this.completeSession('completed');
     } catch (error) {
-      console.error('❌ Quick bulk send interrupted:', error);
-      await this.completeSession('interrupted');
+      if (this.currentSession) {
+        console.error('💥 Error during bulk messaging:', error);
+        await this.completeSession('interrupted');
+      }
     }
   }
+
+  private calculateDelay(messageIndex: number, minDelay: number, maxDelay: number, optionalDelays: any[]): number {
+    if (!optionalDelays?.length) {
+      return Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    }
+
+    // Find highest priority optional delay rule
+    const matchingRule = optionalDelays
+      .filter(rule => rule.everyNMessages?.n && messageIndex % rule.everyNMessages.n === 0)
+      .sort((a, b) => (b.everyNMessages?.n || 0) - (a.everyNMessages?.n || 0))[0];
+
+    if (matchingRule?.everyNMessages) {
+      const { min, max } = matchingRule.everyNMessages;
+      const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+      console.log(`🔄 Every ${matchingRule.everyNMessages.n} messages delay: ${delay}s`);
+      return delay;
+    }
+
+    return Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+  }
+
+
 
   private formatPhoneNumber(phone: string): string {
-    // Remove all non-digit characters efficiently
     const cleanNumber = phone.replace(/\D/g, '');
     
-    // Handle different starting patterns with early returns
     if (cleanNumber.startsWith('0')) {
       return '62' + cleanNumber.substring(1) + '@c.us';
     }
@@ -1118,7 +1073,6 @@ class WhatsAppSender {
       return cleanNumber + '@c.us';
     }
     
-    // Default case: add 62 prefix
     return '62' + cleanNumber + '@c.us';
   }
 
@@ -1162,7 +1116,7 @@ class WhatsAppSender {
         break;
       case 'Export All Sessions':
         await this.exportAllSessions();
-        break;
+         break;
       case 'Reset to Defaults':
         await this.resetConfiguration();
         break;
@@ -1178,7 +1132,7 @@ class WhatsAppSender {
     console.log('========================');
     console.log(`🤖 Client Headless: ${config.client.headless}`);
     console.log(`⏱️  Default Delay Range: ${config.messaging.defaultMinDelay}-${config.messaging.defaultMaxDelay}s`);
-    console.log(`🚀 Quick Bulk Delay Range: ${config.messaging.quickBulkMinDelay}-${config.messaging.quickBulkMaxDelay}s`);
+
     
     // Display optional delays
     if (config.messaging.optionalDelays && config.messaging.optionalDelays.length > 0) {
@@ -1198,7 +1152,7 @@ class WhatsAppSender {
   }
 
   private async updateDelaySettings(): Promise<void> {
-    const { defaultMinDelay, defaultMaxDelay, quickBulkMinDelay, quickBulkMaxDelay } = await inquirer.prompt([
+    const { defaultMinDelay, defaultMaxDelay } = await inquirer.prompt([
       {
         type: 'number',
         name: 'defaultMinDelay',
@@ -1210,18 +1164,6 @@ class WhatsAppSender {
         name: 'defaultMaxDelay',
         message: 'Default maximum delay (seconds):',
         default: this.configManager.get('messaging').defaultMaxDelay
-      },
-      {
-        type: 'number',
-        name: 'quickBulkMinDelay',
-        message: 'Quick bulk minimum delay (seconds):',
-        default: this.configManager.get('messaging').quickBulkMinDelay
-      },
-      {
-        type: 'number',
-        name: 'quickBulkMaxDelay',
-        message: 'Quick bulk maximum delay (seconds):',
-        default: this.configManager.get('messaging').quickBulkMaxDelay
       }
     ]);
 
@@ -1229,8 +1171,6 @@ class WhatsAppSender {
       messaging: {
         defaultMinDelay,
         defaultMaxDelay,
-        quickBulkMinDelay,
-        quickBulkMaxDelay,
         maxRetries: this.configManager.get('messaging').maxRetries,
         optionalDelays: this.configManager.get('messaging').optionalDelays
       }
@@ -1240,26 +1180,76 @@ class WhatsAppSender {
   }
 
   private async updateOptionalDelays(): Promise<void> {
+    console.log('\n🔄 Optional Delays Management');
+    console.log('============================');
+    
+    const currentDelays = this.configManager.get('messaging').optionalDelays;
+    
+    if (currentDelays && currentDelays.length > 0) {
+      console.log('\n📋 Current Optional Delays:');
+      currentDelays.forEach((delay, index) => {
+        if (delay.everyNMessages) {
+          console.log(`  ${index + 1}. Every ${delay.everyNMessages.n} messages: ${delay.everyNMessages.min}-${delay.everyNMessages.max} seconds`);
+        }
+      });
+    } else {
+      console.log('\n📋 No optional delays configured');
+    }
+    
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          'Add New Delay Rule',
+          'Edit Existing Delay Rule',
+          'Delete Delay Rule',
+          'Clear All Delays',
+          'Back to Configuration Menu'
+        ]
+      }
+    ]);
+    
+    switch (action) {
+      case 'Add New Delay Rule':
+        await this.addNewDelayRule();
+        break;
+      case 'Edit Existing Delay Rule':
+        await this.editExistingDelayRule();
+        break;
+      case 'Delete Delay Rule':
+        await this.deleteDelayRule();
+        break;
+      case 'Clear All Delays':
+        await this.clearAllDelays();
+        break;
+      case 'Back to Configuration Menu':
+        return;
+    }
+  }
+
+  private async addNewDelayRule(): Promise<void> {
     const { n, min, max } = await inquirer.prompt([
       {
         type: 'number',
         name: 'n',
         message: 'Apply delay every N messages:',
-        default: this.configManager.get('messaging').optionalDelays[0]?.everyNMessages?.n || 10,
+        default: 10,
         validate: (input: number) => input > 0 ? true : 'N must be greater than 0'
       },
       {
         type: 'number',
         name: 'min',
         message: 'Minimum delay duration (seconds):',
-        default: this.configManager.get('messaging').optionalDelays[0]?.everyNMessages?.min || 30,
+        default: 30,
         validate: (input: number) => input >= 1 ? true : 'Minimum delay must be at least 1 second'
       },
       {
         type: 'number',
         name: 'max',
         message: 'Maximum delay duration (seconds):',
-        default: this.configManager.get('messaging').optionalDelays[0]?.everyNMessages?.max || 60,
+        default: 60,
         validate: (input: number) => input >= 1 ? true : 'Maximum delay must be at least 1 second'
       }
     ]);
@@ -1270,19 +1260,175 @@ class WhatsAppSender {
       return;
     }
 
+    const currentDelays = this.configManager.get('messaging').optionalDelays || [];
+    const newDelay = { everyNMessages: { n, min, max } };
+    
+    // Add new delay rule
+    currentDelays.push(newDelay);
+
     await this.configManager.updateConfig({
       messaging: {
         ...this.configManager.get('messaging'),
-        optionalDelays: [
-          {
-            everyNMessages: { n, min, max }
-          }
-        ]
+        optionalDelays: currentDelays
       }
     });
 
-    console.log('✅ Optional delays updated successfully!');
+    console.log('✅ New delay rule added successfully!');
     console.log(`🔄 Delay every ${n} messages: ${min}-${max} seconds`);
+    
+    // Show updated list
+    await this.updateOptionalDelays();
+  }
+
+  private async editExistingDelayRule(): Promise<void> {
+    const currentDelays = this.configManager.get('messaging').optionalDelays || [];
+    
+    if (currentDelays.length === 0) {
+      console.log('❌ No delay rules to edit');
+      return;
+    }
+    
+    const delayChoices = currentDelays.map((delay, index) => {
+      if (delay.everyNMessages) {
+        return {
+          name: `Every ${delay.everyNMessages.n} messages: ${delay.everyNMessages.min}-${delay.everyNMessages.max} seconds`,
+          value: index
+        };
+      }
+      return null;
+    }).filter(Boolean);
+    
+    const { selectedIndex } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'selectedIndex',
+        message: 'Select delay rule to edit:',
+        choices: delayChoices
+      }
+    ]);
+    
+    const selectedDelay = currentDelays[selectedIndex];
+    if (!selectedDelay.everyNMessages) return;
+    
+    const { n, min, max } = await inquirer.prompt([
+      {
+        type: 'number',
+        name: 'n',
+        message: 'Apply delay every N messages:',
+        default: selectedDelay.everyNMessages.n,
+        validate: (input: number) => input > 0 ? true : 'N must be greater than 0'
+      },
+      {
+        type: 'number',
+        name: 'min',
+        message: 'Minimum delay duration (seconds):',
+        default: selectedDelay.everyNMessages.min,
+        validate: (input: number) => input >= 1 ? true : 'Minimum delay must be at least 1 second'
+      },
+      {
+        type: 'number',
+        name: 'max',
+        message: 'Maximum delay duration (seconds):',
+        default: selectedDelay.everyNMessages.max,
+        validate: (input: number) => input >= 1 ? true : 'Maximum delay must be at least 1 second'
+      }
+    ]);
+
+    // Validate that max delay is greater than min delay
+    if (max <= min) {
+      console.log('❌ Maximum delay must be greater than minimum delay');
+      return;
+    }
+
+    // Update the selected delay rule
+    currentDelays[selectedIndex] = { everyNMessages: { n, min, max } };
+    
+    await this.configManager.updateConfig({
+      messaging: {
+        ...this.configManager.get('messaging'),
+        optionalDelays: currentDelays
+      }
+    });
+
+    console.log('✅ Delay rule updated successfully!');
+    console.log(`🔄 Delay every ${n} messages: ${min}-${max} seconds`);
+    
+    // Show updated list
+    await this.updateOptionalDelays();
+  }
+
+  private async deleteDelayRule(): Promise<void> {
+    const currentDelays = this.configManager.get('messaging').optionalDelays || [];
+    
+    if (currentDelays.length === 0) {
+      console.log('❌ No delay rules to delete');
+      return;
+    }
+    
+    const delayChoices = currentDelays.map((delay, index) => {
+      if (delay.everyNMessages) {
+        return {
+          name: `Every ${delay.everyNMessages.n} messages: ${delay.everyNMessages.min}-${delay.everyNMessages.max} seconds`,
+          value: index
+        };
+      }
+      return null;
+    }).filter(Boolean);
+    
+    const { selectedIndex } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'selectedIndex',
+        message: 'Select delay rule to delete:',
+        choices: delayChoices
+      }
+    ]);
+    
+    const deletedDelay = currentDelays[selectedIndex];
+    if (!deletedDelay.everyNMessages) return;
+    
+    // Remove the selected delay rule
+    currentDelays.splice(selectedIndex, 1);
+    
+    await this.configManager.updateConfig({
+      messaging: {
+        ...this.configManager.get('messaging'),
+        optionalDelays: currentDelays
+      }
+    });
+
+    console.log('✅ Delay rule deleted successfully!');
+    console.log(`🗑️  Removed: Every ${deletedDelay.everyNMessages.n} messages: ${deletedDelay.everyNMessages.min}-${deletedDelay.everyNMessages.max} seconds`);
+    
+    // Show updated list
+    await this.updateOptionalDelays();
+  }
+
+  private async clearAllDelays(): Promise<void> {
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: 'Are you sure you want to clear all optional delays?',
+        default: false
+      }
+    ]);
+    
+    if (confirm) {
+      await this.configManager.updateConfig({
+        messaging: {
+          ...this.configManager.get('messaging'),
+          optionalDelays: []
+        }
+      });
+      
+      console.log('✅ All optional delays cleared successfully!');
+      
+      // Show updated list
+      await this.updateOptionalDelays();
+    } else {
+      console.log('❌ Operation cancelled');
+    }
   }
 
   private async updateClientSettings(): Promise<void> {
@@ -1378,34 +1524,51 @@ class WhatsAppSender {
       console.error('❌ Error destroying WhatsApp client:', error);
     }
   }
+
+
 }
-
-// Global sender instance for signal handlers
-let globalSender: WhatsAppSender | null = null;
-
-// Handle graceful shutdown signals
-const gracefulShutdown = async (signal: string) => {
-  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
-  
-  // Mark current session as interrupted if it exists
-  if (globalSender && globalSender.hasCurrentSession()) {
-    console.log('📊 Marking current session as interrupted...');
-    await globalSender.completeSession('interrupted');
-  }
-  
-  if (globalSender) {
-    await globalSender.destroy();
-  }
-  process.exit(0);
-};
-
-// Set up signal handlers
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 async function main(): Promise<void> {
   const sender = new WhatsAppSender();
-  globalSender = sender; // Set global reference
+  
+  // Set up signal handlers for graceful shutdown
+  const setupSignalHandlers = () => {
+    const gracefulShutdown = async (signal: string) => {
+      console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+      
+      try {
+        // Mark current session as interrupted if it exists
+        if (sender.hasCurrentSession()) {
+          console.log('📊 Marking current session as interrupted...');
+          sender.interruptCurrentSession();
+        }
+        
+        await sender.destroy();
+        console.log('✅ Graceful shutdown completed');
+      } catch (error) {
+        console.error('❌ Error during graceful shutdown:', error);
+      } finally {
+        process.exit(0);
+      }
+    };
+
+    // Set up signal handlers
+    process.on('SIGINT', () => {
+      gracefulShutdown('SIGINT').catch(error => {
+        console.error('❌ Error in SIGINT handler:', error);
+        process.exit(1);
+      });
+    });
+    process.on('SIGTERM', () => {
+      gracefulShutdown('SIGTERM').catch(error => {
+        console.error('❌ Error in SIGTERM handler:', error);
+        process.exit(1);
+      });
+    });
+  };
+
+  // Setup signal handlers
+  setupSignalHandlers();
   
   try {
     await sender.initialize();
@@ -1413,9 +1576,12 @@ async function main(): Promise<void> {
   } catch (error) {
     console.error('💥 Fatal error:', error);
   } finally {
+    // Always cleanup
+    try {
     await sender.destroy();
-    globalSender = null;
-    process.exit(0);
+    } catch (error) {
+      console.error('❌ Error during cleanup:', error);
+    }
   }
 }
 

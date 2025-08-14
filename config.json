@@ -15,13 +15,18 @@
   "messaging": {
     "defaultMinDelay": 3,
     "defaultMaxDelay": 8,
-    "quickBulkMinDelay": 2,
-    "quickBulkMaxDelay": 6,
     "maxRetries": 3,
     "optionalDelays": [
       {
         "everyNMessages": {
           "n": 2,
+          "min": 10,
+          "max": 20
+        }
+      },
+      {
+        "everyNMessages": {
+          "n": 4,
           "min": 30,
           "max": 60
         }
