@@ -1,9 +1,9 @@
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import inquirer from 'inquirer';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { ConfigManager, defaultConfig } from './config';
+import { ConfigManager } from './config';
 
 interface Contact {
   name: string;
@@ -43,7 +43,7 @@ interface BulkMessageSession {
 }
 
 class WhatsAppSender {
-  private client: Client;
+  private client!: Client;
   private contacts: Contact[] = [];
   private messageTemplates: MessageTemplate[] = [];
   private isReady = false;
@@ -53,19 +53,7 @@ class WhatsAppSender {
 
   constructor() {
     this.configManager = new ConfigManager();
-    
-    this.client = new Client({
-      authStrategy: new LocalAuth({
-        clientId: 'whatsapp-sender',
-        dataPath: path.join(__dirname, '../data/sessions')
-      }),
-      puppeteer: {
-        headless: defaultConfig.client.headless,
-        args: defaultConfig.client.puppeteerArgs
-      }
-    });
-
-    this.setupEventListeners();
+    // Client will be created after configuration is loaded in initialize()
   }
 
   private setupEventListeners(): void {
@@ -105,6 +93,21 @@ class WhatsAppSender {
       // Load configuration first
       await this.configManager.loadConfig();
       
+      // Create client with loaded configuration
+      this.client = new Client({
+        authStrategy: new LocalAuth({
+          clientId: 'whatsapp-sender',
+          dataPath: path.join(__dirname, '../data/sessions')
+        }),
+        puppeteer: {
+          headless: this.configManager.get('client').headless,
+          args: this.configManager.get('client').puppeteerArgs
+        }
+      });
+      
+      // Setup event listeners for the new client
+      this.setupEventListeners();
+      
       await this.client.initialize();
       
       // Wait for client to be ready
@@ -141,7 +144,7 @@ class WhatsAppSender {
       } catch (folderError) {
         // Folder doesn't exist, continue to fallback
       }
-
+      
       // Fallback: try to load from the main data/contacts.json
       try {
         const contactsPath = path.join(__dirname, '../data/contacts.json');
@@ -283,22 +286,37 @@ class WhatsAppSender {
         throw new Error('No media files in template');
       }
 
-      // For now, send the first media file with caption
-      // In the future, this could be extended to send multiple media files
-      const mediaPath = template.media[0];
-      
-      // Check if file exists
-      const fs = await import('fs/promises');
-      try {
-        await fs.access(mediaPath);
-      } catch {
-        throw new Error(`Media file not found: ${mediaPath}`);
+      // Send all media files first (without captions)
+      for (let i = 0; i < template.media.length; i++) {
+        const mediaPath = template.media[i];
+        
+        // Check if file exists
+        try {
+          await fs.access(mediaPath);
+        } catch {
+          throw new Error(`Media file not found: ${mediaPath}`);
+        }
+
+        try {
+          // Send media message without caption
+          const media = MessageMedia.fromFilePath(mediaPath);
+          await this.client.sendMessage(phone, media);
+          console.log(`📎 Sent media file ${i + 1}/${template.media.length}: ${path.basename(mediaPath)}`);
+        } catch (mediaError) {
+          throw new Error(`Failed to send media file ${path.basename(mediaPath)}: ${mediaError}`);
+        }
+        
+        // Add small delay between media messages to avoid rate limiting
+        if (i < template.media.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
-      // Send media message with caption using MessageMedia
-      const { MessageMedia } = await import('whatsapp-web.js');
-      const media = MessageMedia.fromFilePath(mediaPath);
-      await this.client.sendMessage(phone, media, { caption: template.content });
+      // Send text content as a separate message last
+      if (template.content && template.content.trim()) {
+        await this.client.sendMessage(phone, template.content);
+        console.log(`💬 Sent text message: ${template.content.substring(0, 50)}${template.content.length > 50 ? '...' : ''}`);
+      }
     } catch (error) {
       console.error(`❌ Failed to send media message: ${error}`);
       throw error;
@@ -698,7 +716,7 @@ class WhatsAppSender {
           name: 'templateChoice',
           message: 'Select a message template:',
                   choices: this.messageTemplates.map(template => ({
-          name: `${template.name}${template.media && template.media.length > 0 ? ' (📎 Media)' : ''}`,
+          name: `${template.name}${template.media && template.media.length > 0 ? ` (📎 ${template.media.length} media file${template.media.length > 1 ? 's' : ''})` : ''}`,
           value: template
         }))
         }
@@ -706,9 +724,9 @@ class WhatsAppSender {
 
       // Check if template has media
       if (templateChoice.media && templateChoice.media.length > 0) {
-        // Send media message with caption
+        // Send media message(s) + text
         await this.sendMediaMessage(formattedPhone, templateChoice);
-        console.log(`✅ Media message sent successfully to ${contactChoice.name}!`);
+        console.log(`✅ Media message(s) + text sent successfully to ${contactChoice.name}! (${templateChoice.media.length} media files)`);
         return;
       } else {
         // Send text message
@@ -1003,15 +1021,19 @@ class WhatsAppSender {
       
       try {
         const formattedPhone = this.formatPhoneNumber(contact.phone);
-        console.log(`📱 [${i + 1}/${contacts.length}] Sending "${randomTemplate.name}" to ${contact.name}...`);
+        const mediaInfo = randomTemplate.media && randomTemplate.media.length > 0 
+          ? ` (${randomTemplate.media.length} media file${randomTemplate.media.length > 1 ? 's' : ''})`
+          : '';
+        console.log(`📱 [${i + 1}/${contacts.length}] Sending "${randomTemplate.name}"${mediaInfo} to ${contact.name}...`);
         
         if (randomTemplate.media && randomTemplate.media.length > 0) {
           await this.sendMediaMessage(formattedPhone, randomTemplate);
+          console.log(`✅ Media message(s) + text sent successfully to ${contact.name} (${randomTemplate.media.length} media files)`);
         } else {
           await this.client.sendMessage(formattedPhone, randomTemplate.content);
+          console.log(`✅ Text message sent successfully to ${contact.name}`);
         }
         
-        console.log(`✅ Message sent successfully to ${contact.name}`);
         await this.updateSessionProgress(contact, randomTemplate, 'success');
 
         if (i < contacts.length - 1) {
