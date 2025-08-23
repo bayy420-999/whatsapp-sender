@@ -94,6 +94,7 @@ class WhatsAppSender {
       // Get client configuration
       const clientConfig = this.configManager.getClient();
       console.log(`📱 Initializing client: ${clientConfig.name} (${clientConfig.id})`);
+      console.log(`🔧 Puppeteer config: userDataDir=${clientConfig.userDataDir}, headless=${clientConfig.headless}`);
       
       // Create client
       this.client = new Client({
@@ -103,7 +104,11 @@ class WhatsAppSender {
         }),
         puppeteer: {
           headless: clientConfig.headless,
-          args: clientConfig.puppeteerArgs
+          args: clientConfig.puppeteerArgs,
+          userDataDir: clientConfig.userDataDir,
+          ignoreDefaultArgs: ['--disable-extensions'],
+          timeout: 60000,
+          executablePath: process.env.CHROME_BIN || undefined
         },
         userAgent: clientConfig.device.userAgent
       });
@@ -1559,6 +1564,7 @@ console.log('   • marketing.json - WhatsApp Session 3 (wa-3)');
         name: this.configManager.get('client').name,
         headless,
         puppeteerArgs: this.configManager.get('client').puppeteerArgs,
+        userDataDir: this.configManager.get('client').userDataDir,
         sessionTimeout: this.configManager.get('client').sessionTimeout,
         clientId: this.configManager.get('client').clientId,
         device: this.configManager.get('client').device
@@ -1600,6 +1606,7 @@ console.log('   • marketing.json - WhatsApp Session 3 (wa-3)');
         name: this.configManager.get('client').name,
         headless: this.configManager.get('client').headless,
         puppeteerArgs: this.configManager.get('client').puppeteerArgs,
+        userDataDir: this.configManager.get('client').userDataDir,
         sessionTimeout: this.configManager.get('client').sessionTimeout,
         clientId: this.configManager.get('client').clientId,
         device: {

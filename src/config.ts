@@ -3,6 +3,7 @@ export interface WhatsAppClient {
   name: string;
   headless: boolean;
   puppeteerArgs: string[];
+  userDataDir: string;
   sessionTimeout: number;
   clientId: string;
   device: {
@@ -65,14 +66,21 @@ export const defaultConfig: WhatsAppConfig = {
       '--no-first-run',
       '--no-zygote',
       '--disable-gpu',
-      '--user-data-dir=/app/browser-profiles/wa-0',
-      '--profile-directory=wa-0',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
       '--disable-features=TranslateUI',
-      '--disable-ipc-flooding-protection'
+      '--disable-ipc-flooding-protection',
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--disable-component-update',
+      '--disable-domain-reliability',
+      '--disable-features=VizDisplayCompositor'
     ],
+    userDataDir: '/app/browser-profiles/wa-0',
     sessionTimeout: 300000, // 5 minutes
     clientId: 'whatsapp-sender-wa-0',
     device: {
