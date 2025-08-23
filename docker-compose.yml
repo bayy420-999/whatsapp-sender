@@ -8,6 +8,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./data:/app/data
+      - wa-0-browser-profiles:/app/browser-profiles
     configs:
       - source: wa_0_config
         target: /app/config.json
@@ -22,6 +23,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./data:/app/data
+      - wa-1-browser-profiles:/app/browser-profiles
     configs:
       - source: wa_1_config
         target: /app/config.json
@@ -33,9 +35,10 @@ services:
     build: .
     container_name: whatsapp-sender-wa-2
     environment:
-      - NODE_ENV=production
+    - NODE_ENV=production
     volumes:
       - ./data:/app/data
+      - wa-2-browser-profiles:/app/browser-profiles
     configs:
       - source: wa_2_config
         target: /app/config.json
@@ -50,6 +53,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./data:/app/data
+      - wa-3-browser-profiles:/app/browser-profiles
     configs:
       - source: wa_3_config
         target: /app/config.json
@@ -73,4 +77,12 @@ networks:
 
 volumes:
   whatsapp-data:
+    driver: local
+  wa-0-browser-profiles:
+    driver: local
+  wa-1-browser-profiles:
+    driver: local
+  wa-2-browser-profiles:
+    driver: local
+  wa-3-browser-profiles:
     driver: local

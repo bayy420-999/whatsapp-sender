@@ -64,7 +64,14 @@ export const defaultConfig: WhatsAppConfig = {
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--user-data-dir=/app/browser-profiles/wa-0',
+      '--profile-directory=wa-0',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection'
     ],
     sessionTimeout: 300000, // 5 minutes
     clientId: 'whatsapp-sender-wa-0',

@@ -172,6 +172,8 @@ Each container can have different settings:
 - **Sessions**: Each container has its own session folder (`data/sessions/{clientId}`)
 - **Authentication**: Each container maintains its own WhatsApp authentication
 - **State**: Each container operates independently
+- **Browser Profiles**: Each container has isolated browser profiles (`/app/browser-profiles/wa-{n}`)
+- **Puppeteer Isolation**: Unique user data directories prevent browser conflicts
 
 ## Monitoring and Troubleshooting
 
@@ -190,6 +192,8 @@ docker stats
 1. **Authentication Failed**: Check if the container has been properly initialized
 2. **Session Conflicts**: Ensure each container has a unique client ID
 3. **Resource Limits**: Monitor memory and CPU usage for multiple containers
+4. **Browser Profile Conflicts**: Each container now has isolated browser profiles to prevent Puppeteer errors
+5. **Puppeteer Errors**: If you see browser-related errors, restart the specific container to refresh its browser profile
 
 ### Log Analysis
 
@@ -249,6 +253,12 @@ docker-compose up -d --force-recreate whatsapp-wa-0
 
 # Restore from backup
 docker cp ./backup-wa-0 whatsapp-wa-0:/app/data/sessions/wa-0
+
+# Clean browser profiles (fixes Puppeteer errors)
+.\cleanup-browser-profiles.ps1 clean wa-0
+
+# Reset specific container
+.\cleanup-browser-profiles.ps1 reset wa-1
 
 ## Advanced Usage
 

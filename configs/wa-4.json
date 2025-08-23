@@ -10,7 +10,14 @@
       "--disable-accelerated-2d-canvas",
       "--no-first-run",
       "--no-zygote",
-      "--disable-gpu"
+      "--disable-gpu",
+      "--user-data-dir=/app/browser-profiles/wa-4",
+      "--profile-directory=wa-4",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding",
+      "--disable-features=TranslateUI",
+      "--disable-ipc-flooding-protection"
     ],
     "sessionTimeout": 300000,
     "clientId": "whatsapp-sender-wa-0",
