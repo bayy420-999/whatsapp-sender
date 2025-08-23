@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  whatsapp-wa-0:
+    build: .
+    container_name: whatsapp-sender-wa-0
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    configs:
+      - source: wa_0_config
+        target: /app/config.json
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+
+  whatsapp-wa-1:
+    build: .
+    container_name: whatsapp-sender-wa-1
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    configs:
+      - source: wa_1_config
+        target: /app/config.json
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+
+  whatsapp-wa-2:
+    build: .
+    container_name: whatsapp-sender-wa-2
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    configs:
+      - source: wa_2_config
+        target: /app/config.json
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+
+  whatsapp-wa-3:
+    build: .
+    container_name: whatsapp-sender-wa-3
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    configs:
+      - source: wa_3_config
+        target: /app/config.json
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+
+configs:
+  wa_0_config:
+    file: ./configs/wa-1.json
+  wa_1_config:
+    file: ./configs/wa-2.json
+  wa_2_config:
+    file: ./configs/wa-3.json
+  wa_3_config:
+    file: ./configs/wa-4.json
+
+networks:
+  whatsapp-network:
+    driver: bridge
+
+volumes:
+  whatsapp-data:
+    driver: local

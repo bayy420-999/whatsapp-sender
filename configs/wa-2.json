@@ -1,5 +1,7 @@
 {
   "client": {
+    "id": "wa-2",
+    "name": "WhatsApp Session 2",
     "headless": true,
     "puppeteerArgs": [
       "--no-sandbox",
@@ -10,25 +12,31 @@
       "--no-zygote",
       "--disable-gpu"
     ],
-    "sessionTimeout": 300000
+    "sessionTimeout": 300000,
+    "clientId": "whatsapp-sender-wa-2",
+    "device": {
+      "name": "Android Phone",
+      "browser": "Chrome Mobile",
+      "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+    }
   },
   "messaging": {
-    "defaultMinDelay": 3,
-    "defaultMaxDelay": 8,
+    "defaultMinDelay": 2,
+    "defaultMaxDelay": 6,
     "maxRetries": 3,
     "optionalDelays": [
       {
         "everyNMessages": {
-          "n": 2,
-          "min": 10,
-          "max": 20
+          "n": 5,
+          "min": 15,
+          "max": 30
         }
       },
       {
         "everyNMessages": {
-          "n": 4,
-          "min": 30,
-          "max": 60
+          "n": 10,
+          "min": 45,
+          "max": 90
         }
       }
     ]

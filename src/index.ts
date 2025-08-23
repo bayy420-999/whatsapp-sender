@@ -56,32 +56,30 @@ class WhatsAppSender {
     // Client will be created after configuration is loaded in initialize()
   }
 
-  private setupEventListeners(): void {
-    this.client.on('qr', (qr: string) => {
+  private setupEventListeners(client: Client): void {
+    client.on('qr', (qr: string) => {
       console.log('\n📱 QR Code received! Please scan with WhatsApp:');
       qrcode.generate(qr, { small: true });
       console.log('\nScan the QR code above with your WhatsApp mobile app');
     });
 
-    this.client.on('ready', () => {
+    client.on('ready', () => {
       console.log('✅ WhatsApp client is ready!');
       this.isReady = true;
     });
 
-    this.client.on('authenticated', () => {
-      console.log('🔐 WhatsApp authenticated successfully');
+    client.on('authenticated', () => {
+      console.log('🔐 WhatsApp client authenticated successfully');
     });
 
-    this.client.on('auth_failure', (msg: string) => {
+    client.on('auth_failure', (msg: string) => {
       console.error('❌ Authentication failed:', msg);
     });
 
-    this.client.on('disconnected', (reason: string) => {
-      console.log('🔌 WhatsApp disconnected:', reason);
+    client.on('disconnected', (reason: string) => {
+      console.log('🔌 WhatsApp client disconnected:', reason);
       this.isReady = false;
     });
-
-
   }
 
 
@@ -93,22 +91,29 @@ class WhatsAppSender {
       // Load configuration first
       await this.configManager.loadConfig();
       
-      // Create client with loaded configuration
+      // Get client configuration
+      const clientConfig = this.configManager.getClient();
+      console.log(`📱 Initializing client: ${clientConfig.name} (${clientConfig.id})`);
+      
+      // Create client
       this.client = new Client({
         authStrategy: new LocalAuth({
-          clientId: 'whatsapp-sender',
-          dataPath: path.join(__dirname, '../data/sessions')
+          clientId: clientConfig.clientId,
+          dataPath: path.join(__dirname, this.configManager.get('paths').sessionsFolder, clientConfig.id)
         }),
         puppeteer: {
-          headless: this.configManager.get('client').headless,
-          args: this.configManager.get('client').puppeteerArgs
-        }
+          headless: clientConfig.headless,
+          args: clientConfig.puppeteerArgs
+        },
+        userAgent: clientConfig.device.userAgent
       });
       
-      // Setup event listeners for the new client
-      this.setupEventListeners();
+      // Setup event listeners for this client
+      this.setupEventListeners(this.client);
       
+      // Initialize client
       await this.client.initialize();
+      console.log(`🚀 Client ${clientConfig.name} initialized`);
       
       // Wait for client to be ready
       while (!this.isReady) {
@@ -144,7 +149,7 @@ class WhatsAppSender {
       } catch (folderError) {
         // Folder doesn't exist, continue to fallback
       }
-      
+
       // Fallback: try to load from the main data/contacts.json
       try {
         const contactsPath = path.join(__dirname, '../data/contacts.json');
@@ -272,6 +277,9 @@ class WhatsAppSender {
           break;
         case 'Manage Configuration':
           await this.manageConfiguration();
+          break;
+        case 'Docker Help':
+          await this.showDockerHelp();
           break;
         case 'Exit':
           console.log('👋 Goodbye!');
@@ -1101,6 +1109,9 @@ class WhatsAppSender {
   private async manageConfiguration(): Promise<void> {
     console.log('\n⚙️  Configuration Management');
     console.log('==========================');
+    console.log('🐳 Docker Mode: Configuration changes are temporary');
+    console.log('📝 To persist changes, edit the config file and restart container');
+    console.log('');
     
     const { action } = await inquirer.prompt([
       {
@@ -1147,12 +1158,55 @@ class WhatsAppSender {
     }
   }
 
+  private async showDockerHelp(): Promise<void> {
+    console.log('\n🐳 Docker Container Help');
+    console.log('========================');
+    console.log('This WhatsApp Sender is running in a Docker container.');
+    console.log('');
+    console.log('📝 Configuration Management:');
+    console.log('   • Configuration changes in interactive mode are TEMPORARY');
+    console.log('   • To persist changes, edit the config file and restart container');
+    console.log('   • Config files are located in the ./configs/ directory');
+    console.log('');
+    console.log('🔄 Container Management:');
+    console.log('   • View containers: docker-compose ps');
+    console.log('   • View logs: docker-compose logs [container-name]');
+    console.log('   • Restart container: docker-compose restart [container-name]');
+    console.log('   • Stop all: docker-compose down');
+    console.log('   • Start all: docker-compose up -d');
+    console.log('');
+    console.log('📁 Config Files:');
+console.log('   • default.json - WhatsApp Session 0 (wa-0)');
+console.log('   • business.json - WhatsApp Session 1 (wa-1)');
+console.log('   • personal.json - WhatsApp Session 2 (wa-2)');
+console.log('   • marketing.json - WhatsApp Session 3 (wa-3)');
+    console.log('');
+    console.log('💡 Tips:');
+    console.log('   • Each container has its own WhatsApp session');
+    console.log('   • Device profiles make each container appear different');
+    console.log('   • Shared data (contacts, templates) across all containers');
+    console.log('   • Use PowerShell script: .\\docker-manager.ps1 help');
+    console.log('');
+    
+    await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'continue',
+        message: 'Press Enter to continue...'
+      }
+    ]);
+  }
+
   private async viewConfiguration(): Promise<void> {
     const config = this.configManager.getConfig();
     
     console.log('\n📋 Current Configuration:');
     console.log('========================');
+    console.log(`🐳 Mode: Docker Container (${config.client.name})`);
     console.log(`🤖 Client Headless: ${config.client.headless}`);
+    console.log(`📱 Device: ${config.client.device.name}`);
+    console.log(`🌐 Browser: ${config.client.device.browser}`);
+    console.log(`🔧 User Agent: ${config.client.device.userAgent.substring(0, 50)}...`);
     console.log(`⏱️  Default Delay Range: ${config.messaging.defaultMinDelay}-${config.messaging.defaultMaxDelay}s`);
 
     
@@ -1199,6 +1253,8 @@ class WhatsAppSender {
     });
 
     console.log('✅ Delay settings updated successfully!');
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
   }
 
   private async updateOptionalDelays(): Promise<void> {
@@ -1297,6 +1353,8 @@ class WhatsAppSender {
 
     console.log('✅ New delay rule added successfully!');
     console.log(`🔄 Delay every ${n} messages: ${min}-${max} seconds`);
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
     
     // Show updated list
     await this.updateOptionalDelays();
@@ -1374,6 +1432,8 @@ class WhatsAppSender {
 
     console.log('✅ Delay rule updated successfully!');
     console.log(`🔄 Delay every ${n} messages: ${min}-${max} seconds`);
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
     
     // Show updated list
     await this.updateOptionalDelays();
@@ -1421,6 +1481,8 @@ class WhatsAppSender {
 
     console.log('✅ Delay rule deleted successfully!');
     console.log(`🗑️  Removed: Every ${deletedDelay.everyNMessages.n} messages: ${deletedDelay.everyNMessages.min}-${deletedDelay.everyNMessages.max} seconds`);
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
     
     // Show updated list
     await this.updateOptionalDelays();
@@ -1444,16 +1506,44 @@ class WhatsAppSender {
         }
       });
       
-      console.log('✅ All optional delays cleared successfully!');
-      
-      // Show updated list
-      await this.updateOptionalDelays();
+          console.log('✅ All optional delays cleared successfully!');
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
+    
+    // Show updated list
+    await this.updateOptionalDelays();
     } else {
       console.log('❌ Operation cancelled');
     }
   }
 
   private async updateClientSettings(): Promise<void> {
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'What would you like to update?',
+        choices: [
+          'Headless Mode',
+          'Device Settings',
+          'Back to Configuration Menu'
+        ]
+      }
+    ]);
+
+    switch (action) {
+      case 'Headless Mode':
+        await this.updateHeadlessMode();
+        break;
+      case 'Device Settings':
+        await this.updateDeviceSettings();
+        break;
+      case 'Back to Configuration Menu':
+        return;
+    }
+  }
+
+  private async updateHeadlessMode(): Promise<void> {
     const { headless } = await inquirer.prompt([
       {
         type: 'confirm',
@@ -1465,14 +1555,64 @@ class WhatsAppSender {
 
     await this.configManager.updateConfig({
       client: {
+        id: this.configManager.get('client').id,
+        name: this.configManager.get('client').name,
         headless,
         puppeteerArgs: this.configManager.get('client').puppeteerArgs,
-        sessionTimeout: this.configManager.get('client').sessionTimeout
+        sessionTimeout: this.configManager.get('client').sessionTimeout,
+        clientId: this.configManager.get('client').clientId,
+        device: this.configManager.get('client').device
       }
     });
 
-    console.log('✅ Client settings updated successfully!');
-    console.log('⚠️  Note: Client settings changes require restart to take effect');
+    console.log('✅ Headless mode updated successfully!');
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
+  }
+
+  private async updateDeviceSettings(): Promise<void> {
+    const currentDevice = this.configManager.get('client').device;
+    
+    const { deviceName, browserName, userAgent } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'deviceName',
+        message: 'Device name:',
+        default: currentDevice.name
+      },
+      {
+        type: 'input',
+        name: 'browserName',
+        message: 'Browser name:',
+        default: currentDevice.browser
+      },
+      {
+        type: 'input',
+        name: 'userAgent',
+        message: 'User agent string:',
+        default: currentDevice.userAgent
+      }
+    ]);
+
+    await this.configManager.updateConfig({
+      client: {
+        id: this.configManager.get('client').id,
+        name: this.configManager.get('client').name,
+        headless: this.configManager.get('client').headless,
+        puppeteerArgs: this.configManager.get('client').puppeteerArgs,
+        sessionTimeout: this.configManager.get('client').sessionTimeout,
+        clientId: this.configManager.get('client').clientId,
+        device: {
+          name: deviceName,
+          browser: browserName,
+          userAgent: userAgent
+        }
+      }
+    });
+
+    console.log('✅ Device settings updated successfully!');
+    console.log('⚠️  Note: In Docker mode, configuration changes are temporary');
+    console.log('🔄 To persist changes, update the config file and restart the container');
   }
 
   private async resetConfiguration(): Promise<void> {
@@ -1487,8 +1627,9 @@ class WhatsAppSender {
 
     if (confirm) {
       this.configManager = new ConfigManager();
-      await this.configManager.saveConfig();
       console.log('✅ Configuration reset to defaults successfully!');
+      console.log('⚠️  Note: In Docker mode, this reset is temporary');
+      console.log('🔄 To persist the reset, update the config file and restart the container');
     } else {
       console.log('❌ Configuration reset cancelled');
     }

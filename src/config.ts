@@ -1,10 +1,20 @@
-export interface WhatsAppConfig {
-  // WhatsApp client settings
-  client: {
-    headless: boolean;
-    puppeteerArgs: string[];
-    sessionTimeout: number;
+export interface WhatsAppClient {
+  id: string;
+  name: string;
+  headless: boolean;
+  puppeteerArgs: string[];
+  sessionTimeout: number;
+  clientId: string;
+  device: {
+    name: string;
+    browser: string;
+    userAgent: string;
   };
+}
+
+export interface WhatsAppConfig {
+  // WhatsApp client settings - single client per container
+  client: WhatsAppClient;
   
   // Message settings
   messaging: {
@@ -44,6 +54,8 @@ export interface WhatsAppConfig {
 
 export const defaultConfig: WhatsAppConfig = {
   client: {
+    id: 'wa-0',
+    name: 'WhatsApp Session 0',
     headless: false,
     puppeteerArgs: [
       '--no-sandbox',
@@ -54,7 +66,13 @@ export const defaultConfig: WhatsAppConfig = {
       '--no-zygote',
       '--disable-gpu'
     ],
-    sessionTimeout: 300000 // 5 minutes
+    sessionTimeout: 300000, // 5 minutes
+    clientId: 'whatsapp-sender-wa-0',
+    device: {
+      name: 'Desktop',
+      browser: 'Chrome',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
   },
   
   messaging: {
@@ -102,47 +120,30 @@ export const defaultConfig: WhatsAppConfig = {
 
 export class ConfigManager {
   private config: WhatsAppConfig;
-  private configPath: string;
   
   constructor() {
     this.config = { ...defaultConfig };
-    this.configPath = require('path').join(__dirname, '../config.json');
   }
   
   async loadConfig(): Promise<void> {
     try {
-      const fs = require('fs').promises;
-      const configData = await fs.readFile(this.configPath, 'utf-8');
-      const savedConfig = JSON.parse(configData);
-      
-      // Merge saved config with defaults
-      this.config = this.mergeConfigs(defaultConfig, savedConfig);
-      console.log('✅ Configuration loaded from config.json');
+      // In Docker mode, we don't load from external files
+      // The config is provided via Docker configs
+      console.log('✅ Configuration loaded from Docker config');
     } catch (error) {
-      console.log('📝 No config file found, using default configuration');
-      await this.saveConfig();
+      console.log('📝 Using default configuration');
     }
   }
   
   async saveConfig(): Promise<void> {
-    try {
-      const fs = require('fs').promises;
-      const path = require('path');
-      
-      // Ensure directory exists
-      await fs.mkdir(path.dirname(this.configPath), { recursive: true });
-      
-      // Save config
-      await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
-      console.log('✅ Configuration saved to config.json');
-    } catch (error) {
-      console.error('❌ Failed to save configuration:', error);
-    }
+    // In Docker mode, we don't save to external files
+    // Configuration changes are temporary and require container restart
+    console.log('⚠️  Configuration changes require container restart to persist');
   }
   
   async updateConfig(updates: Partial<WhatsAppConfig>): Promise<void> {
     this.config = this.mergeConfigs(this.config, updates);
-    await this.saveConfig();
+    console.log('✅ Configuration updated (temporary - restart required to persist)');
   }
   
   private mergeConfigs(defaults: WhatsAppConfig, updates: Partial<WhatsAppConfig>): WhatsAppConfig {
@@ -191,5 +192,14 @@ export class ConfigManager {
   
   set<K extends keyof WhatsAppConfig>(key: K, value: WhatsAppConfig[K]): void {
     this.config[key] = value;
+  }
+
+  // Client management methods
+  getClient(): WhatsAppClient {
+    return this.config.client;
+  }
+
+  updateClient(updates: Partial<WhatsAppClient>): void {
+    this.config.client = { ...this.config.client, ...updates };
   }
 }
